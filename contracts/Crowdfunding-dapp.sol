@@ -1,0 +1,274 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CrowdfundingDapp {
+    struct Milestone {
+        string description;
+        uint256 targetAmount;
+        bool isCompleted;
+        bool fundsReleased;
+        uint256 votesFor;
+        uint256 votesAgainst;
+        mapping(address => bool) voters;
+    }
+
+    struct Campaign {
+        address payable owner;
+        string title;
+        string description;
+        uint256 fundingGoal;
+        uint256 totalFunds;
+        uint256 deadline;
+        bool isOpen;
+        uint256 milestoneCount;
+        mapping(uint256 => Milestone) milestones;
+        mapping(address => uint256) contributions;
+        address[] contributors;  // Added to track contributor addresses
+        uint256 releasedFunds;   // Track total released milestone funds
+        bool isRefunded;
+    }
+
+    uint256 public campaignCount;
+    mapping(uint256 => Campaign) private campaigns;
+
+    event CampaignCreated(uint256 campaignId, address owner, string title, uint256 goal, uint256 deadline);
+    event ContributionMade(uint256 campaignId, address contributor, uint256 amount);
+    event MilestoneAdded(uint256 campaignId, uint256 milestoneId, string description, uint256 target);
+    event MilestoneVoted(uint256 campaignId, uint256 milestoneId, address voter, bool vote);
+    event FundsReleased(uint256 campaignId, uint256 milestoneId, uint256 amount);
+    event RefundIssued(uint256 campaignId, address contributor, uint256 amount);
+    event CampaignClosed(uint256 campaignId);
+
+    modifier onlyOwner(uint256 _campaignId) {
+        require(msg.sender == campaigns[_campaignId].owner, "Only owner can call");
+        _;
+    }
+
+    modifier campaignExists(uint256 _campaignId) {
+        require(_campaignId > 0 && _campaignId <= campaignCount, "Campaign does not exist");
+        _;
+    }
+
+    modifier campaignOpen(uint256 _campaignId) {
+        require(campaigns[_campaignId].isOpen, "Campaign is closed");
+        _;
+    }
+
+    function createCampaign(
+        string calldata _title,
+        string calldata _description,
+        uint256 _fundingGoal,
+        uint256 _durationDays
+    ) external {
+        require(_fundingGoal > 0, "Goal must be > 0");
+        require(_durationDays > 0, "Duration must be > 0");
+
+        campaignCount++;
+        Campaign storage c = campaigns[campaignCount];
+        c.owner = payable(msg.sender);
+        c.title = _title;
+        c.description = _description;
+        c.fundingGoal = _fundingGoal;
+        c.deadline = block.timestamp + (_durationDays * 1 days);
+        c.isOpen = true;
+
+        emit CampaignCreated(campaignCount, msg.sender, _title, _fundingGoal, c.deadline);
+    }
+
+    function addMilestone(uint256 _campaignId, string calldata _desc, uint256 _target)
+        external
+        campaignExists(_campaignId)
+        onlyOwner(_campaignId)
+        campaignOpen(_campaignId)
+    {
+        require(_target > 0, "Target must be > 0");
+        Campaign storage c = campaigns[_campaignId];
+        require(c.totalFunds < c.fundingGoal, "Campaign already funded");
+
+        c.milestoneCount++;
+        Milestone storage m = c.milestones[c.milestoneCount];
+        m.description = _desc;
+        m.targetAmount = _target;
+        m.isCompleted = false;
+        m.fundsReleased = false;
+        m.votesFor = 0;
+        m.votesAgainst = 0;
+
+        emit MilestoneAdded(_campaignId, c.milestoneCount, _desc, _target);
+    }
+
+    function contribute(uint256 _campaignId)
+        external
+        payable
+        campaignExists(_campaignId)
+        campaignOpen(_campaignId)
+    {
+        Campaign storage c = campaigns[_campaignId];
+        require(block.timestamp < c.deadline, "Campaign expired");
+        require(msg.value > 0, "Must send some ether");
+
+        if (c.contributions[msg.sender] == 0) {
+            // New contributor, add to contributors list
+            c.contributors.push(msg.sender);
+        }
+
+        c.contributions[msg.sender] += msg.value;
+        c.totalFunds += msg.value;
+
+        // Automatically close campaign if funding goal reached
+        if (c.totalFunds >= c.fundingGoal) {
+            c.isOpen = false;
+            emit CampaignClosed(_campaignId);
+        }
+
+        emit ContributionMade(_campaignId, msg.sender, msg.value);
+    }
+
+    // Contributor votes to approve milestone completion
+    function voteMilestone(uint256 _campaignId, uint256 _milestoneId, bool approve)
+        external
+        campaignExists(_campaignId)
+    {
+        Campaign storage c = campaigns[_campaignId];
+        require(c.contributions[msg.sender] > 0, "Only contributors can vote");
+        require(_milestoneId > 0 && _milestoneId <= c.milestoneCount, "Invalid milestone");
+
+        Milestone storage m = c.milestones[_milestoneId];
+        require(!m.voters[msg.sender], "Already voted");
+        require(!m.fundsReleased, "Funds already released for milestone");
+
+        m.voters[msg.sender] = true;
+        if (approve) {
+            m.votesFor++;
+        } else {
+            m.votesAgainst++;
+        }
+
+        // Simple majority vote check (more than half contributors)
+        uint256 totalContributors = getContributorCount(_campaignId);
+        if (m.votesFor > totalContributors / 2) {
+            m.isCompleted = true;
+        }
+
+        emit MilestoneVoted(_campaignId, _milestoneId, msg.sender, approve);
+    }
+
+    // Owner withdraws funds for a completed milestone
+    function releaseFunds(uint256 _campaignId, uint256 _milestoneId)
+        external
+        onlyOwner(_campaignId)
+        campaignExists(_campaignId)
+    {
+        Campaign storage c = campaigns[_campaignId];
+        Milestone storage m = c.milestones[_milestoneId];
+
+        require(m.isCompleted, "Milestone not approved yet");
+        require(!m.fundsReleased, "Funds already released");
+
+        // Check available funds after previous milestone releases
+        uint256 availableFunds = c.totalFunds - c.releasedFunds;
+        require(availableFunds >= m.targetAmount, "Insufficient available funds");
+
+        m.fundsReleased = true;
+        c.releasedFunds += m.targetAmount;
+
+        // Send milestone target amount to owner
+        c.owner.transfer(m.targetAmount);
+
+        emit FundsReleased(_campaignId, _milestoneId, m.targetAmount);
+    }
+
+    // Refund contributors if campaign fails
+    function claimRefund(uint256 _campaignId)
+        external
+        campaignExists(_campaignId)
+    {
+        Campaign storage c = campaigns[_campaignId];
+        require(block.timestamp > c.deadline, "Campaign not ended");
+        require(c.totalFunds < c.fundingGoal, "Campaign was successful");
+        require(c.contributions[msg.sender] > 0, "No contributions found");
+
+        uint256 amount = c.contributions[msg.sender];
+        c.contributions[msg.sender] = 0;
+        payable(msg.sender).transfer(amount);
+
+        emit RefundIssued(_campaignId, msg.sender, amount);
+    }
+
+    // Helper to get total contributor count
+    function getContributorCount(uint256 _campaignId) public view returns (uint256) {
+        Campaign storage c = campaigns[_campaignId];
+        return c.contributors.length;
+    }
+
+    // Get contributors addresses (optional helper)
+    function getContributors(uint256 _campaignId) external view returns (address[] memory) {
+        return campaigns[_campaignId].contributors;
+    }
+
+    // Close campaign manually after deadline if still open
+    function closeCampaign(uint256 _campaignId)
+        external
+        campaignExists(_campaignId)
+    {
+        Campaign storage c = campaigns[_campaignId];
+        require(block.timestamp >= c.deadline, "Deadline not reached");
+        require(c.isOpen, "Campaign already closed");
+        c.isOpen = false;
+
+        emit CampaignClosed(_campaignId);
+    }
+
+    function getCampaign(uint256 _campaignId)
+        external
+        view
+        campaignExists(_campaignId)
+        returns (
+            address owner,
+            string memory title,
+            string memory description,
+            uint256 fundingGoal,
+            uint256 totalFunds,
+            uint256 deadline,
+            bool isOpen,
+            uint256 milestoneCount
+        )
+    {
+        Campaign storage c = campaigns[_campaignId];
+        return (
+            c.owner,
+            c.title,
+            c.description,
+            c.fundingGoal,
+            c.totalFunds,
+            c.deadline,
+            c.isOpen,
+            c.milestoneCount
+        );
+    }
+
+    function getMilestone(uint256 _campaignId, uint256 _milestoneId)
+        external
+        view
+        campaignExists(_campaignId)
+        returns (
+            string memory description,
+            uint256 targetAmount,
+            bool isCompleted,
+            bool fundsReleased,
+            uint256 votesFor,
+            uint256 votesAgainst
+        )
+    {
+        Campaign storage c = campaigns[_campaignId];
+        Milestone storage m = c.milestones[_milestoneId];
+        return (
+            m.description,
+            m.targetAmount,
+            m.isCompleted,
+            m.fundsReleased,
+            m.votesFor,
+            m.votesAgainst
+        );
+    }
+}
