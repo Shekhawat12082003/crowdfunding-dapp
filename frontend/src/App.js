@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
+import './App.css';
+
 
 // Replace with your deployed contract address
 const CONTRACT_ADDRESS = "0xb6AD66D24a8023D3813156df657387Fd1fc9F09e";
@@ -271,7 +273,7 @@ function App() {
   }
 
   return (
-    <div className="container">
+    <div className="app-container">
       <h1>Decentralized Crowdfunding DApp</h1>
       <p>Connected account: {account ?? "Not connected"}</p>
 
