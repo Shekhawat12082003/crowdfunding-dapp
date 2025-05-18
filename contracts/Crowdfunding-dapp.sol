@@ -108,14 +108,13 @@ contract CrowdfundingDapp {
         require(msg.value > 0, "Must send some ether");
 
         if (c.contributions[msg.sender] == 0) {
-            // New contributor, add to contributors list
             c.contributors.push(msg.sender);
         }
 
         c.contributions[msg.sender] += msg.value;
         c.totalFunds += msg.value;
 
-        // Automatically close campaign if funding goal reached
+       
         if (c.totalFunds >= c.fundingGoal) {
             c.isOpen = false;
             emit CampaignClosed(_campaignId);
@@ -124,7 +123,6 @@ contract CrowdfundingDapp {
         emit ContributionMade(_campaignId, msg.sender, msg.value);
     }
 
-    // Contributor votes to approve milestone completion
     function voteMilestone(uint256 _campaignId, uint256 _milestoneId, bool approve)
         external
         campaignExists(_campaignId)
@@ -144,7 +142,6 @@ contract CrowdfundingDapp {
             m.votesAgainst++;
         }
 
-        // Simple majority vote check (more than half contributors)
         uint256 totalContributors = getContributorCount(_campaignId);
         if (m.votesFor > totalContributors / 2) {
             m.isCompleted = true;
@@ -153,7 +150,6 @@ contract CrowdfundingDapp {
         emit MilestoneVoted(_campaignId, _milestoneId, msg.sender, approve);
     }
 
-    // Owner withdraws funds for a completed milestone
     function releaseFunds(uint256 _campaignId, uint256 _milestoneId)
         external
         onlyOwner(_campaignId)
@@ -165,20 +161,17 @@ contract CrowdfundingDapp {
         require(m.isCompleted, "Milestone not approved yet");
         require(!m.fundsReleased, "Funds already released");
 
-        // Check available funds after previous milestone releases
         uint256 availableFunds = c.totalFunds - c.releasedFunds;
         require(availableFunds >= m.targetAmount, "Insufficient available funds");
 
         m.fundsReleased = true;
         c.releasedFunds += m.targetAmount;
 
-        // Send milestone target amount to owner
         c.owner.transfer(m.targetAmount);
 
         emit FundsReleased(_campaignId, _milestoneId, m.targetAmount);
     }
 
-    // Refund contributors if campaign fails
     function claimRefund(uint256 _campaignId)
         external
         campaignExists(_campaignId)
@@ -195,18 +188,15 @@ contract CrowdfundingDapp {
         emit RefundIssued(_campaignId, msg.sender, amount);
     }
 
-    // Helper to get total contributor count
     function getContributorCount(uint256 _campaignId) public view returns (uint256) {
         Campaign storage c = campaigns[_campaignId];
         return c.contributors.length;
     }
 
-    // Get contributors addresses (optional helper)
     function getContributors(uint256 _campaignId) external view returns (address[] memory) {
         return campaigns[_campaignId].contributors;
     }
 
-    // Close campaign manually after deadline if still open
     function closeCampaign(uint256 _campaignId)
         external
         campaignExists(_campaignId)
