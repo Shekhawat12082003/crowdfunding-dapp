@@ -3,12 +3,11 @@ import { ethers } from "ethers";
 import './App.css';
 
 
-// Replace with your deployed contract address
 const CONTRACT_ADDRESS = "0xb6AD66D24a8023D3813156df657387Fd1fc9F09e";
 
-// ABI - You can replace this with your generated ABI JSON from compilation
+
 const CONTRACT_ABI = [
-  // Only essential fragments shown for brevity - expand as needed
+  
   "function campaignCount() view returns (uint256)",
   "function createCampaign(string title, string description, uint256 fundingGoal, uint256 durationDays) external",
   "function getCampaign(uint256) view returns (address owner, string title, string description, uint256 fundingGoal, uint256 totalFunds, uint256 deadline, bool isOpen, uint256 milestoneCount)",
@@ -30,7 +29,6 @@ function App() {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Form states for creating campaign
   const [newCampaign, setNewCampaign] = useState({
     title: "",
     description: "",
@@ -38,10 +36,8 @@ function App() {
     durationDays: "",
   });
 
-  // Form states for adding milestone per campaign
   const [milestoneInputs, setMilestoneInputs] = useState({});
 
-  // Connect wallet and setup contract
   useEffect(() => {
     if (!window.ethereum) {
       alert("Please install MetaMask!");
@@ -72,7 +68,6 @@ function App() {
     });
   }, []);
 
-  // Load campaigns from contract
   useEffect(() => {
     async function loadCampaigns() {
       if (!contract) return;
@@ -82,7 +77,7 @@ function App() {
         const loaded = [];
         for (let i = 1; i <= count; i++) {
           const c = await contract.getCampaign(i);
-          // c is a tuple - unpack it
+        
           loaded.push({
             id: i,
             owner: c.owner,
@@ -104,7 +99,6 @@ function App() {
     loadCampaigns();
   }, [contract]);
 
-  // Handle campaign creation
   async function handleCreateCampaign(e) {
     e.preventDefault();
     if (!contract) return;
@@ -119,7 +113,7 @@ function App() {
       await tx.wait();
       alert("Campaign created!");
       setNewCampaign({ title: "", description: "", fundingGoal: "", durationDays: "" });
-      // Refresh campaigns
+ 
       const count = await contract.campaignCount();
       const c = await contract.getCampaign(count);
       setCampaigns((prev) => [
@@ -141,7 +135,6 @@ function App() {
     }
   }
 
-  // Handle adding milestone
   async function handleAddMilestone(campaignId) {
     if (!contract) return;
     const input = milestoneInputs[campaignId];
@@ -154,9 +147,9 @@ function App() {
       const tx = await contract.addMilestone(campaignId, input.description, targetWei);
       await tx.wait();
       alert("Milestone added!");
-      // Reset input for campaign
+     
       setMilestoneInputs((prev) => ({ ...prev, [campaignId]: { description: "", target: "" } }));
-      // Refresh campaigns to update milestone count
+     
       const c = await contract.getCampaign(campaignId);
       setCampaigns((prev) =>
         prev.map((camp) =>
@@ -173,7 +166,6 @@ function App() {
     }
   }
 
-  // Handle input changes for milestone descriptions and target amounts
   function handleMilestoneInputChange(campaignId, field, value) {
     setMilestoneInputs((prev) => ({
       ...prev,
@@ -184,7 +176,6 @@ function App() {
     }));
   }
 
-  // Handle contribution
   async function handleContribute(campaignId) {
     if (!contract) return;
     const amount = prompt("Enter contribution amount in ETH:");
@@ -207,11 +198,9 @@ function App() {
       alert("Contribution failed: " + err.message);
     }
   }
-
-  // State to store milestones per campaign
+ 
   const [milestonesMap, setMilestonesMap] = useState({});
 
-  // Load milestones on demand per campaign
   async function loadMilestones(campaignId, milestoneCount) {
     if (!contract) return;
     const loaded = [];
@@ -230,14 +219,13 @@ function App() {
     setMilestonesMap((prev) => ({ ...prev, [campaignId]: loaded }));
   }
 
-  // Voting on milestones
   async function voteMilestone(campaignId, milestoneId, approve) {
     if (!contract) return;
     try {
       const tx = await contract.voteMilestone(campaignId, milestoneId, approve);
       await tx.wait();
       alert("Vote cast successfully!");
-      // Reload milestones for this campaign
+      
       const milestoneCount = campaigns.find((c) => c.id === campaignId)?.milestoneCount || 0;
       loadMilestones(campaignId, milestoneCount);
     } catch (err) {
@@ -245,14 +233,13 @@ function App() {
     }
   }
 
-  // Release funds for milestone
   async function releaseFunds(campaignId, milestoneId) {
     if (!contract) return;
     try {
       const tx = await contract.releaseFunds(campaignId, milestoneId);
       await tx.wait();
       alert("Funds released for milestone!");
-      // Reload milestones
+    
       const milestoneCount = campaigns.find((c) => c.id === campaignId)?.milestoneCount || 0;
       loadMilestones(campaignId, milestoneCount);
     } catch (err) {
@@ -260,7 +247,6 @@ function App() {
     }
   }
 
-  // Claim refund
   async function claimRefund(campaignId) {
     if (!contract) return;
     try {
