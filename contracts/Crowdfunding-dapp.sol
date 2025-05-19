@@ -9,7 +9,8 @@ contract CrowdfundingDapp {
         bool fundsReleased;
         uint256 votesFor;
         uint256 votesAgainst;
-        mapping(address => bool) voters;
+        mapping(address => bool) voters;      // Tracks if address voted
+        mapping(address => bool) votes;       // true = approve, false = reject
     }
 
     struct Campaign {
@@ -23,9 +24,10 @@ contract CrowdfundingDapp {
         uint256 milestoneCount;
         mapping(uint256 => Milestone) milestones;
         mapping(address => uint256) contributions;
-        address[] contributors;  // Added to track contributor addresses
-        uint256 releasedFunds;   // Track total released milestone funds
+        address[] contributors;
+        uint256 releasedFunds;
         bool isRefunded;
+        bool isDeleted;
     }
 
     uint256 public campaignCount;
@@ -38,6 +40,7 @@ contract CrowdfundingDapp {
     event FundsReleased(uint256 campaignId, uint256 milestoneId, uint256 amount);
     event RefundIssued(uint256 campaignId, address contributor, uint256 amount);
     event CampaignClosed(uint256 campaignId);
+    event CampaignDeleted(uint256 campaignId);
 
     modifier onlyOwner(uint256 _campaignId) {
         require(msg.sender == campaigns[_campaignId].owner, "Only owner can call");
@@ -46,6 +49,7 @@ contract CrowdfundingDapp {
 
     modifier campaignExists(uint256 _campaignId) {
         require(_campaignId > 0 && _campaignId <= campaignCount, "Campaign does not exist");
+        require(!campaigns[_campaignId].isDeleted, "Campaign deleted");
         _;
     }
 
@@ -114,7 +118,6 @@ contract CrowdfundingDapp {
         c.contributions[msg.sender] += msg.value;
         c.totalFunds += msg.value;
 
-       
         if (c.totalFunds >= c.fundingGoal) {
             c.isOpen = false;
             emit CampaignClosed(_campaignId);
@@ -123,6 +126,7 @@ contract CrowdfundingDapp {
         emit ContributionMade(_campaignId, msg.sender, msg.value);
     }
 
+    // Multiple votes per contributor per milestone, overrides previous vote
     function voteMilestone(uint256 _campaignId, uint256 _milestoneId, bool approve)
         external
         campaignExists(_campaignId)
@@ -132,20 +136,33 @@ contract CrowdfundingDapp {
         require(_milestoneId > 0 && _milestoneId <= c.milestoneCount, "Invalid milestone");
 
         Milestone storage m = c.milestones[_milestoneId];
-        require(!m.voters[msg.sender], "Already voted");
         require(!m.fundsReleased, "Funds already released for milestone");
 
+        bool hasVotedBefore = m.voters[msg.sender];
+        bool previousVote = m.votes[msg.sender];
+
+        // If voted before, adjust vote counts
+        if (hasVotedBefore) {
+            if (previousVote) {
+                m.votesFor--;
+            } else {
+                m.votesAgainst--;
+            }
+        }
+
+        // Record new vote
         m.voters[msg.sender] = true;
+        m.votes[msg.sender] = approve;
+
         if (approve) {
             m.votesFor++;
         } else {
             m.votesAgainst++;
         }
 
+        // Update completion status based on majority vote
         uint256 totalContributors = getContributorCount(_campaignId);
-        if (m.votesFor > totalContributors / 2) {
-            m.isCompleted = true;
-        }
+        m.isCompleted = m.votesFor > totalContributors / 2;
 
         emit MilestoneVoted(_campaignId, _milestoneId, msg.sender, approve);
     }
@@ -185,6 +202,9 @@ contract CrowdfundingDapp {
         c.contributions[msg.sender] = 0;
         payable(msg.sender).transfer(amount);
 
+        // Mark refunded after at least one refund
+        c.isRefunded = true;
+
         emit RefundIssued(_campaignId, msg.sender, amount);
     }
 
@@ -207,6 +227,22 @@ contract CrowdfundingDapp {
         c.isOpen = false;
 
         emit CampaignClosed(_campaignId);
+    }
+
+    function deleteCampaign(uint256 _campaignId)
+        external
+        campaignExists(_campaignId)
+        onlyOwner(_campaignId)
+    {
+        Campaign storage c = campaigns[_campaignId];
+
+        require(!c.isOpen, "Campaign is still open");
+        require(c.isRefunded || c.totalFunds == 0, "Refunds not completed");
+        require(!c.isDeleted, "Campaign already deleted");
+
+        c.isDeleted = true;
+
+        emit CampaignDeleted(_campaignId);
     }
 
     function getCampaign(uint256 _campaignId)
