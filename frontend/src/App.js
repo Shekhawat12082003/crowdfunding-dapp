@@ -2,12 +2,9 @@ import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import './App.css';
 
-
-const CONTRACT_ADDRESS = "0xb6AD66D24a8023D3813156df657387Fd1fc9F09e";
-
+const CONTRACT_ADDRESS = "0xA438A82B170B11a1D7AA2E8fD0f760cB6772A38A";
 
 const CONTRACT_ABI = [
-  
   "function campaignCount() view returns (uint256)",
   "function createCampaign(string title, string description, uint256 fundingGoal, uint256 durationDays) external",
   "function getCampaign(uint256) view returns (address owner, string title, string description, uint256 fundingGoal, uint256 totalFunds, uint256 deadline, bool isOpen, uint256 milestoneCount)",
@@ -18,6 +15,8 @@ const CONTRACT_ABI = [
   "function releaseFunds(uint256 campaignId, uint256 milestoneId) external",
   "function claimRefund(uint256 campaignId) external",
   "function getContributorCount(uint256 campaignId) view returns (uint256)",
+  // Optional: If your contract supports deleting campaigns
+  "function deleteCampaign(uint256 campaignId) external",
 ];
 
 function App() {
@@ -37,12 +36,15 @@ function App() {
   });
 
   const [milestoneInputs, setMilestoneInputs] = useState({});
+  const [milestonesMap, setMilestonesMap] = useState({});
 
+  // Connect wallet and setup contract
   useEffect(() => {
     if (!window.ethereum) {
       alert("Please install MetaMask!");
       return;
     }
+
     const prov = new ethers.providers.Web3Provider(window.ethereum);
     setProvider(prov);
 
@@ -50,12 +52,11 @@ function App() {
       const signer = prov.getSigner();
       setSigner(signer);
       signer.getAddress().then(setAccount);
-
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       setContract(contract);
     });
 
-    // Listen for account change
+    // Account change listener
     window.ethereum.on("accountsChanged", (accounts) => {
       if (accounts.length > 0) {
         setAccount(accounts[0]);
@@ -68,6 +69,7 @@ function App() {
     });
   }, []);
 
+  // Load all campaigns
   useEffect(() => {
     async function loadCampaigns() {
       if (!contract) return;
@@ -77,7 +79,6 @@ function App() {
         const loaded = [];
         for (let i = 1; i <= count; i++) {
           const c = await contract.getCampaign(i);
-        
           loaded.push({
             id: i,
             owner: c.owner,
@@ -99,9 +100,11 @@ function App() {
     loadCampaigns();
   }, [contract]);
 
+  // Create campaign handler
   async function handleCreateCampaign(e) {
     e.preventDefault();
     if (!contract) return;
+
     try {
       const goalWei = ethers.utils.parseEther(newCampaign.fundingGoal);
       const tx = await contract.createCampaign(
@@ -111,9 +114,11 @@ function App() {
         Number(newCampaign.durationDays)
       );
       await tx.wait();
+
       alert("Campaign created!");
       setNewCampaign({ title: "", description: "", fundingGoal: "", durationDays: "" });
- 
+
+      // Refresh campaigns
       const count = await contract.campaignCount();
       const c = await contract.getCampaign(count);
       setCampaigns((prev) => [
@@ -135,6 +140,7 @@ function App() {
     }
   }
 
+  // Add milestone handler
   async function handleAddMilestone(campaignId) {
     if (!contract) return;
     const input = milestoneInputs[campaignId];
@@ -146,18 +152,18 @@ function App() {
       const targetWei = ethers.utils.parseEther(input.target);
       const tx = await contract.addMilestone(campaignId, input.description, targetWei);
       await tx.wait();
+
       alert("Milestone added!");
-     
+
+      // Reset milestone inputs for campaign
       setMilestoneInputs((prev) => ({ ...prev, [campaignId]: { description: "", target: "" } }));
-     
+
+      // Refresh campaign milestoneCount
       const c = await contract.getCampaign(campaignId);
       setCampaigns((prev) =>
         prev.map((camp) =>
           camp.id === campaignId
-            ? {
-                ...camp,
-                milestoneCount: c.milestoneCount.toNumber(),
-              }
+            ? { ...camp, milestoneCount: c.milestoneCount.toNumber() }
             : camp
         )
       );
@@ -166,6 +172,7 @@ function App() {
     }
   }
 
+  // Milestone input handler
   function handleMilestoneInputChange(campaignId, field, value) {
     setMilestoneInputs((prev) => ({
       ...prev,
@@ -176,6 +183,76 @@ function App() {
     }));
   }
 
+  // Load milestones for a campaign
+  async function loadMilestones(campaignId, milestoneCount) {
+    if (!contract) return;
+
+    try {
+      const loaded = [];
+      for (let i = 1; i <= milestoneCount; i++) {
+        const m = await contract.getMilestone(campaignId, i);
+        loaded.push({
+          id: i,
+          description: m.description,
+          targetAmount: ethers.utils.formatEther(m.targetAmount),
+          isCompleted: m.isCompleted,
+          fundsReleased: m.fundsReleased,
+          votesFor: m.votesFor.toNumber(),
+          votesAgainst: m.votesAgainst.toNumber(),
+        });
+      }
+      setMilestonesMap((prev) => ({ ...prev, [campaignId]: loaded }));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to load milestones");
+    }
+  }
+
+  // Vote on milestone
+  async function voteMilestone(campaignId, milestoneId, approve) {
+    if (!contract) return;
+    try {
+      const tx = await contract.voteMilestone(campaignId, milestoneId, approve);
+      await tx.wait();
+      alert("Vote cast successfully!");
+
+      // Reload milestones for campaign
+      const milestoneCount = campaigns.find((c) => c.id === campaignId)?.milestoneCount || 0;
+      loadMilestones(campaignId, milestoneCount);
+    } catch (err) {
+      alert("Voting failed: " + err.message);
+    }
+  }
+
+  // Release funds
+  async function releaseFunds(campaignId, milestoneId) {
+    if (!contract) return;
+    try {
+      const tx = await contract.releaseFunds(campaignId, milestoneId);
+      await tx.wait();
+      alert("Funds released for milestone!");
+
+      // Reload milestones for campaign
+      const milestoneCount = campaigns.find((c) => c.id === campaignId)?.milestoneCount || 0;
+      loadMilestones(campaignId, milestoneCount);
+    } catch (err) {
+      alert("Release funds failed: " + err.message);
+    }
+  }
+
+  // Claim refund
+  async function claimRefund(campaignId) {
+    if (!contract) return;
+    try {
+      const tx = await contract.claimRefund(campaignId);
+      await tx.wait();
+      alert("Refund claimed if eligible.");
+    } catch (err) {
+      alert("Refund claim failed: " + err.message);
+    }
+  }
+
+  // Contribute
   async function handleContribute(campaignId) {
     if (!contract) return;
     const amount = prompt("Enter contribution amount in ETH:");
@@ -185,6 +262,7 @@ function App() {
       const tx = await contract.contribute(campaignId, { value });
       await tx.wait();
       alert("Contribution successful!");
+
       // Refresh totalFunds for campaign
       const c = await contract.getCampaign(campaignId);
       setCampaigns((prev) =>
@@ -198,68 +276,56 @@ function App() {
       alert("Contribution failed: " + err.message);
     }
   }
- 
-  const [milestonesMap, setMilestonesMap] = useState({});
 
-  async function loadMilestones(campaignId, milestoneCount) {
+  // Optional: Delete campaign (only if supported in contract)
+  async function deleteCampaign(campaignId) {
     if (!contract) return;
+    const confirmDelete = window.confirm("Are you sure you want to delete this campaign?");
+    if (!confirmDelete) return;
+
+    try {
+      const tx = await contract.deleteCampaign(campaignId);
+      await tx.wait();
+      alert("Campaign deleted!");
+
+      // Remove from campaigns list locally
+      setCampaigns((prev) => prev.filter((c) => c.id !== campaignId));
+    } catch (err) {
+      alert("Delete failed: " + err.message);
+    }
+  }
+  async function handleDeleteCampaign(campaignId) {
+  if (!contract) return;
+  try {
+    const tx = await contract.deleteCampaign(campaignId);
+    await tx.wait();
+    alert("Campaign deleted successfully!");
+    // Refresh campaigns after deletion
+    const count = await contract.campaignCount();
     const loaded = [];
-    for (let i = 1; i <= milestoneCount; i++) {
-      const m = await contract.getMilestone(campaignId, i);
+    for (let i = 1; i <= count; i++) {
+      const c = await contract.getCampaign(i);
       loaded.push({
         id: i,
-        description: m.description,
-        targetAmount: ethers.utils.formatEther(m.targetAmount),
-        isCompleted: m.isCompleted,
-        fundsReleased: m.fundsReleased,
-        votesFor: m.votesFor.toNumber(),
-        votesAgainst: m.votesAgainst.toNumber(),
+        owner: c.owner,
+        title: c.title,
+        description: c.description,
+        fundingGoal: ethers.utils.formatEther(c.fundingGoal),
+        totalFunds: ethers.utils.formatEther(c.totalFunds),
+        deadline: new Date(c.deadline.toNumber() * 1000),
+        isOpen: c.isOpen,
+        milestoneCount: c.milestoneCount.toNumber(),
       });
     }
-    setMilestonesMap((prev) => ({ ...prev, [campaignId]: loaded }));
+    setCampaigns(loaded);
+  } catch (err) {
+    alert("Delete campaign failed: " + err.message);
   }
+}
 
-  async function voteMilestone(campaignId, milestoneId, approve) {
-    if (!contract) return;
-    try {
-      const tx = await contract.voteMilestone(campaignId, milestoneId, approve);
-      await tx.wait();
-      alert("Vote cast successfully!");
-      
-      const milestoneCount = campaigns.find((c) => c.id === campaignId)?.milestoneCount || 0;
-      loadMilestones(campaignId, milestoneCount);
-    } catch (err) {
-      alert("Voting failed: " + err.message);
-    }
-  }
-
-  async function releaseFunds(campaignId, milestoneId) {
-    if (!contract) return;
-    try {
-      const tx = await contract.releaseFunds(campaignId, milestoneId);
-      await tx.wait();
-      alert("Funds released for milestone!");
-    
-      const milestoneCount = campaigns.find((c) => c.id === campaignId)?.milestoneCount || 0;
-      loadMilestones(campaignId, milestoneCount);
-    } catch (err) {
-      alert("Release funds failed: " + err.message);
-    }
-  }
-
-  async function claimRefund(campaignId) {
-    if (!contract) return;
-    try {
-      const tx = await contract.claimRefund(campaignId);
-      await tx.wait();
-      alert("Refund claimed if eligible.");
-    } catch (err) {
-      alert("Refund claim failed: " + err.message);
-    }
-  }
 
   return (
-    <div className="app-container">
+    <div className="container">
       <h1>Decentralized Crowdfunding DApp</h1>
       <p>Connected account: {account ?? "Not connected"}</p>
 
@@ -304,7 +370,8 @@ function App() {
       <section>
         <h2>All Campaigns</h2>
         {loading && <p>Loading campaigns...</p>}
-        {campaigns.length === 0 && !loading && <p>No campaigns found.</p>}
+        {!loading && campaigns.length === 0 && <p>No campaigns found.</p>}
+
         {campaigns.map((campaign) => (
           <div key={campaign.id} className="campaign">
             <h3>{campaign.title}</h3>
@@ -324,9 +391,20 @@ function App() {
               </span>
             </p>
 
+            {/* Delete campaign button if user is owner */}
+            {account?.toLowerCase() === campaign.owner.toLowerCase() && (
+              <button onClick={() => deleteCampaign(campaign.id)}>Delete Campaign</button>
+            )}
+
+            {/* Refund button if campaign is closed and user is not owner */}
+          {account?.toLowerCase() === campaign.owner.toLowerCase() && !campaign.isOpen && (
+             <button onClick={() => handleDeleteCampaign(campaign.id)}>Delete Campaign</button>
+          )}
+
+
             {/* Milestone adding form (only if owner and campaign open) */}
             {account?.toLowerCase() === campaign.owner.toLowerCase() && campaign.isOpen && (
-              <div>
+              <div className="add-milestone">
                 <h4>Add Milestone</h4>
                 <input
                   type="text"
@@ -338,65 +416,68 @@ function App() {
                 />
                 <input
                   type="number"
-                  placeholder="Target ETH"
                   step="0.01"
                   min="0"
+                  placeholder="Target Amount (ETH)"
                   value={milestoneInputs[campaign.id]?.target || ""}
-                  onChange={(e) => handleMilestoneInputChange(campaign.id, "target", e.target.value)}
+                  onChange={(e) =>
+                    handleMilestoneInputChange(campaign.id, "target", e.target.value)
+                  }
                 />
                 <button onClick={() => handleAddMilestone(campaign.id)}>Add Milestone</button>
               </div>
             )}
 
-            <div>
-              <button
-                onClick={() => loadMilestones(campaign.id, campaign.milestoneCount)}
-                disabled={milestonesMap[campaign.id]?.length === campaign.milestoneCount}
-              >
-                Load Milestones ({campaign.milestoneCount})
-              </button>
-            </div>
+            <button onClick={() => loadMilestones(campaign.id, campaign.milestoneCount)}>
+              Load Milestones ({campaign.milestoneCount})
+            </button>
 
-            {/* List milestones if loaded */}
-            {milestonesMap[campaign.id]?.map((milestone) => (
-              <div key={milestone.id} className="milestone">
-                <p>
-                  <strong>Milestone {milestone.id}:</strong> {milestone.description}
-                  <br />
-                  Target: {milestone.targetAmount} ETH
-                  <br />
-                  Completed: {milestone.isCompleted ? "Yes" : "No"}
-                  <br />
-                  Funds Released: {milestone.fundsReleased ? "Yes" : "No"}
-                  <br />
-                  Votes For: {milestone.votesFor} | Votes Against: {milestone.votesAgainst}
-                </p>
-                <div className="milestone-vote">
-                  <button
-                    className="vote-btn"
-                    onClick={() => voteMilestone(campaign.id, milestone.id, true)}
-                  >
-                    Vote Approve
-                  </button>
-                  <button onClick={() => voteMilestone(campaign.id, milestone.id, false)}>
-                    Vote Reject
-                  </button>
+            {/* Milestones List */}
+            {milestonesMap[campaign.id] &&
+              milestonesMap[campaign.id].map((ms) => (
+                <div key={ms.id} className="milestone">
+                  <h5>Milestone #{ms.id}</h5>
+                  <p>Description: {ms.description}</p>
+                  <p>Target: {ms.targetAmount} ETH</p>
+                  <p>
+                    Completed: {ms.isCompleted ? "Yes" : "No"}
+                    <br />
+                    Funds Released: {ms.fundsReleased ? "Yes" : "No"}
+                    <br />
+                    Votes For: {ms.votesFor}
+                    <br />
+                    Votes Against: {ms.votesAgainst}
+                  </p>
 
-                  {/* Only owner can release funds */}
-                  {account?.toLowerCase() === campaign.owner.toLowerCase() && milestone.isCompleted && !milestone.fundsReleased && (
-                    <button onClick={() => releaseFunds(campaign.id, milestone.id)}>Release Funds</button>
+                  {/* Voting Buttons if campaign is open */}
+                  {campaign.isOpen && (
+                    <>
+                      <button onClick={() => voteMilestone(campaign.id, ms.id, true)}>
+                        Vote Approve
+                      </button>
+                      <button onClick={() => voteMilestone(campaign.id, ms.id, false)}>
+                        Vote Reject
+                      </button>
+                    </>
                   )}
-                </div>
-              </div>
-            ))}
 
-            {/* Contribution button if campaign open */}
+                  {/* Release funds button if user is owner and milestone completed and not yet released */}
+                  {account?.toLowerCase() === campaign.owner.toLowerCase() &&
+                    ms.isCompleted &&
+                    !ms.fundsReleased && (
+                      <button onClick={() => releaseFunds(campaign.id, ms.id)}>
+                        Release Funds
+                      </button>
+                    )}
+                </div>
+              ))}
+
+            {/* Contribute and Refund Buttons */}
             {campaign.isOpen && (
               <button onClick={() => handleContribute(campaign.id)}>Contribute</button>
             )}
 
-            {/* Claim refund if campaign closed and goal not reached */}
-            {!campaign.isOpen && Number(campaign.totalFunds) < Number(campaign.fundingGoal) && (
+            {!campaign.isOpen && (
               <button onClick={() => claimRefund(campaign.id)}>Claim Refund</button>
             )}
           </div>
