@@ -8,6 +8,7 @@
 - [Project Vision](#project-vision)  
 - [Future Scope](#future-scope)  
 - [Key Features](#key-features)  
+- [Frontend Showcase](#frontend-showcase)  
 
 ---
 
@@ -74,6 +75,34 @@ The **Crowdfunding Dapp** offers a comprehensive set of features designed to fac
 
 ---
 
-This **Crowdfunding Dapp** thus provides a robust framework for decentralized fundraising, combining financial security, community governance, and milestone-based accountability to drive the success of innovative projects.
+## Frontend Showcase
 
+To provide a clear view of the user experience and interface, below are some screenshots and demo videos of the Crowdfunding Dapp frontend.
+
+### Demo Video
+
+![Demo Video](./assets/demo-video.gif)  
+*Short demo illustrating key interactions: creating campaigns, contributing funds, voting on milestones, and claiming refunds.*
+
+> **Note:** For best experience, please watch the video in full-screen mode.
+
+### Screenshots
+
+#### 1. Campaign Creation Page  
+![Campaign Creation](./assets/campaign-creation.png)  
+_Easily create new fundraising campaigns by specifying goals, deadlines, and descriptions._
+
+#### 2. Campaign Listing  
+![Campaign Listing](./assets/campaign-listing.png)  
+_View all active campaigns with summary details and funding progress._
+
+#### 3. Milestone Voting Interface  
+![Milestone Voting](./assets/milestone-voting.png)  
+_Contributors can view milestones and vote to approve or reject fund releases._
+
+#### 4. Contribution and Refund  
+![Contribution & Refund](./assets/contribution-refund.png)  
+_Securely contribute to campaigns and claim refunds if funding goals are not met._
+
+---
 
