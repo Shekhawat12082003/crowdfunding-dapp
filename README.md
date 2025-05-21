@@ -85,8 +85,6 @@ https://github.com/user-attachments/assets/b30164dd-080a-4902-a8a3-f230da51061c
 
 *Short demo illustrating key interactions: creating campaigns, contributing funds, voting on milestones, and claiming refunds.*
 
-> **Note:** For best experience, please watch the video in full-screen mode.
-
 ### Screenshots
 
 #### 1. Campaign Creation Page  
