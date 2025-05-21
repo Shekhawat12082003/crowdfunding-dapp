@@ -81,7 +81,8 @@ To provide a clear view of the user experience and interface, below are some scr
 
 ### Demo Video
 
-![Demo Video](./assets/demo-video.gif)  
+https://github.com/user-attachments/assets/0ccb5cd0-829a-49ed-8df9-84508baa1536
+
 *Short demo illustrating key interactions: creating campaigns, contributing funds, voting on milestones, and claiming refunds.*
 
 > **Note:** For best experience, please watch the video in full-screen mode.
