@@ -114,5 +114,3 @@ _Securely contribute to campaigns and claim refunds if funding goals are not met
  ## Contract Address
  0xa0a9579D2F7b201cF2C09C09bE8B6D230b198c13
  ![Screenshot 2025-05-21 130749](https://github.com/user-attachments/assets/60644c0b-4392-4c45-ab0e-70295f50710d)
-
- 
