@@ -31,11 +31,12 @@ Moreover, contributors are protected by a refund mechanism that allows them to r
 ---
 
 ## Project Vision
-The core vision of the **Crowdfunding Dapp** is to democratize access to funding by harnessing the power of blockchain technology. Our goal is to eliminate the dependence on centralized crowdfunding platforms and their associated fees, delays, and potential biases.
 
-We aim to create a platform that fosters community-driven funding, where contributors are active stakeholders in the success of projects. By incorporating transparent milestone approvals and fund releases, we strive to cultivate a culture of responsibility and progress-based financing.
+The **Crowdfunding DApp** aims to revolutionize the funding landscape by harnessing the power of blockchain technology. Our goal is to eliminate reliance on traditional, centralized crowdfunding platforms that often involve high fees, unnecessary delays, and opaque decision-making.
 
-Ultimately, the platform seeks to empower creators, innovators, and entrepreneurs worldwide by providing them with a decentralized, secure, and equitable funding mechanism that inspires confidence and fosters collaboration.
+We are building a decentralized, community-driven platform where contributors are not just donors—but active stakeholders. Through transparent, milestone-based fund release mechanisms and collective voting, the DApp ensures accountability, promotes progress-based financing, and builds trust between creators and supporters.
+
+This platform is designed to empower creators, entrepreneurs, and innovators across the globe by providing a secure, equitable, and censorship-resistant funding mechanism. By fostering transparency, collaboration, and inclusivity, we aim to democratize access to capital and support meaningful projects that make a difference
 
 ---
 
