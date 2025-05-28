@@ -80,18 +80,33 @@ textarea {
 
 /* Button */
 button {
-  padding: 12px 24px;
+  width: 200px;               
+  height: 50px;               
+  padding: 0 16px;            
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-radius: 14px;
   background-color: #7e3ff2;
   color: white;
   border: none;
-  border-radius: 12px;
   cursor: pointer;
-  font-weight: 600;
-  font-size: 1rem;
+  box-shadow: 0 6px 16px rgba(126, 63, 242, 0.3);
+  transition: background-color 0.3s ease, transform 0.3s ease;
+  display: inline-flex;      
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+button:hover {
+  background: linear-gradient(135deg, #5b22b2, #8e63e8);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(126, 63, 242, 0.4);
 }
 
-button:hover {
-  background-color: #5b22b2;
+button:active {
+  transform: translateY(1px);
+   transform: scale(0.98);
+  box-shadow: 0 4px 12px rgba(126, 63, 242, 0.2);
 }
 
 /* Campaign */
