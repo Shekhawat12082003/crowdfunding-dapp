@@ -78,21 +78,19 @@ function App() {
         const count = await contract.campaignCount();
         const loaded = [];
         for (let i = 1; i <= count; i++) {
-        const c = await contract.getCampaign(i);
-        if (c.isOpen) { 
-            loaded.push({
-              id: i,
-              owner: c.owner,
-              title: c.title,
-              description: c.description,
-              fundingGoal: ethers.utils.formatEther(c.fundingGoal),
-              totalFunds: ethers.utils.formatEther(c.totalFunds),
-              deadline: new Date(c.deadline.toNumber() * 1000),
-              isOpen: c.isOpen,
-             milestoneCount: c.milestoneCount.toNumber(),
-            });
-         }
-      }
+  const c = await contract.getCampaign(i);
+          loaded.push({
+            id: i,
+            owner: c.owner,
+            title: c.title,
+            description: c.description,
+            fundingGoal: ethers.utils.formatEther(c.fundingGoal),
+            totalFunds: ethers.utils.formatEther(c.totalFunds),
+            deadline: new Date(c.deadline.toNumber() * 1000),
+            isOpen: c.isOpen,
+            milestoneCount: c.milestoneCount.toNumber(),
+          });
+        }
 
         setCampaigns(loaded);
       } catch (err) {
