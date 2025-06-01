@@ -86,7 +86,7 @@ To provide a clear view of the user experience and interface, below are some scr
 
 https://github.com/user-attachments/assets/b30164dd-080a-4902-a8a3-f230da51061c
 
-*Short demo illustrating key interactions: creating campaigns, contributing funds, voting on milestones, and claiming refunds.*
+*A concise demonstration showcasing core functionalities: campaign creation, fund contributions, milestone-based voting, and refund claiming.*
 
 ### Screenshots
 
