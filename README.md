@@ -93,22 +93,22 @@ https://github.com/user-attachments/assets/b30164dd-080a-4902-a8a3-f230da51061c
 #### 1. Campaign Creation Page  
 ![Screenshot 2025-05-19 125411](https://github.com/user-attachments/assets/6f1b12f8-5f97-4b85-84e6-d46b2dde792d)
 
-_Easily create new fundraising campaigns by specifying goals, deadlines, and descriptions._
+_Seamlessly launch new fundraising campaigns by defining funding goals, deadlines, and detailed descriptions._
 
 #### 2. Campaign Listing  
 ![image](https://github.com/user-attachments/assets/2d36dfc1-b870-49f5-b4de-531688d6bf93) 
 
-_View all active campaigns with summary details and funding progress._
+_Browse all active campaigns with summarized information and real-time funding progress indicators._
 
 #### 3. Milestone Voting Interface  
 ![image](https://github.com/user-attachments/assets/c0cdc4a4-0b41-4640-949a-bac14bb976ad)
 
-_Contributors can view milestones and vote to approve or reject fund releases._
+_Contributors can review campaign milestones and participate in voting to approve or reject fund disbursements._
 
 #### 4. Contribution and Refund  
 ![image](https://github.com/user-attachments/assets/57e8d682-2fd4-41b8-af99-b489477f7bd6)
 
-_Securely contribute to campaigns and claim refunds if funding goals are not met._
+_Make secure contributions to campaigns and claim refunds seamlessly if funding goals are not achieved._
 
 ---
 
