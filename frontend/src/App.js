@@ -27,6 +27,8 @@ function App() {
 
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [successfulCampaigns, setSuccessfulCampaigns] = useState(0);
+  const [refundedCampaigns, setRefundedCampaigns] = useState(0);
 
   const [newCampaign, setNewCampaign] = useState({
     title: "",
@@ -69,37 +71,52 @@ function App() {
     });
   }, []);
 
-  // Load all campaigns
-  useEffect(() => {
-    async function loadCampaigns() {
-      if (!contract) return;
-      setLoading(true);
-      try {
-        const count = await contract.campaignCount();
-        const loaded = [];
-        for (let i = 1; i <= count; i++) {
-  const c = await contract.getCampaign(i);
-          loaded.push({
-            id: i,
-            owner: c.owner,
-            title: c.title,
-            description: c.description,
-            fundingGoal: ethers.utils.formatEther(c.fundingGoal),
-            totalFunds: ethers.utils.formatEther(c.totalFunds),
-            deadline: new Date(c.deadline.toNumber() * 1000),
-            isOpen: c.isOpen,
-            milestoneCount: c.milestoneCount.toNumber(),
-          });
-        }
-
-        setCampaigns(loaded);
-      } catch (err) {
-        console.error(err);
+ useEffect(() => {
+  async function loadCampaigns() {
+    if (!contract) return;
+    setLoading(true);
+    try {
+      const count = await contract.campaignCount();
+      const loaded = [];
+      for (let i = 1; i <= count; i++) {
+        const c = await contract.getCampaign(i);
+        loaded.push({
+          id: i,
+          owner: c.owner,
+          title: c.title,
+          description: c.description,
+          fundingGoal: ethers.utils.formatEther(c.fundingGoal),
+          totalFunds: ethers.utils.formatEther(c.totalFunds),
+          deadline: new Date(c.deadline.toNumber() * 1000),
+          isOpen: c.isOpen,
+          milestoneCount: c.milestoneCount.toNumber(),
+        });
       }
-      setLoading(false);
+
+      setCampaigns(loaded);
+
+      // Calculate owner reputation for connected account
+      if (account) {
+        const ownedCampaigns = loaded.filter(c => c.owner.toLowerCase() === account.toLowerCase());
+
+        const successful = ownedCampaigns.filter(c => !c.isOpen && parseFloat(c.totalFunds) >= parseFloat(c.fundingGoal)).length;
+        const refunded = ownedCampaigns.filter(c => !c.isOpen && parseFloat(c.totalFunds) < parseFloat(c.fundingGoal)).length;
+
+        setSuccessfulCampaigns(successful);
+        setRefundedCampaigns(refunded);
+      } else {
+        setSuccessfulCampaigns(0);
+        setRefundedCampaigns(0);
+      }
+
+    } catch (err) {
+      console.error(err);
     }
-    loadCampaigns();
-  }, [contract]);
+    setLoading(false);
+  }
+
+  loadCampaigns();
+}, [contract, account]);  // added 'account' to dependency array so it updates if user changes
 
   // Create campaign handler
   async function handleCreateCampaign(e) {
@@ -277,31 +294,17 @@ function App() {
       alert("Contribution failed: " + err.message);
     }
   }
-
-  // Optional: Delete campaign (only if supported in contract)
-  async function deleteCampaign(campaignId) {
-    if (!contract) return;
-    const confirmDelete = window.confirm("Are you sure you want to delete this campaign?");
-    if (!confirmDelete) return;
-
-    try {
-      const tx = await contract.deleteCampaign(campaignId);
-      await tx.wait();
-      alert("Campaign deleted!");
-
-      // Remove from campaigns list locally
-      setCampaigns((prev) => prev.filter((c) => c.id !== campaignId));
-    } catch (err) {
-      alert("Delete failed: " + err.message);
-    }
-  }
-  async function handleDeleteCampaign(campaignId) {
+  
+async function handleDeleteCampaign(campaignId) {
   if (!contract) return;
+  const confirmDelete = window.confirm("Are you sure you want to delete this campaign?");
+  if (!confirmDelete) return;
+
   try {
     const tx = await contract.deleteCampaign(campaignId);
     await tx.wait();
     alert("Campaign deleted successfully!");
-    // Refresh campaigns after deletion
+
     const count = await contract.campaignCount();
     const loaded = [];
     for (let i = 1; i <= count; i++) {
@@ -323,15 +326,53 @@ function App() {
     alert("Delete campaign failed: " + err.message);
   }
 }
-
+function getFundingProgress(campaign) {
+  const total = parseFloat(campaign.totalFunds);
+  const goal = parseFloat(campaign.fundingGoal);
+  if (!goal || goal === 0) return 0;
+  return Math.min(100, (total / goal) * 100);
+}
 
 
   return (
     <div className="container">
       <h1>Decentralized Crowdfunding DApp</h1>
       <p>Connected account: {account ?? "Not connected"}</p>
-
+  
+     
       <section>
+        {account && (
+  <div
+    className="owner-reputation-summary"
+    style={{
+      marginTop: "20px",
+      padding: "20px",
+      borderRadius: "12px",
+      backgroundColor: "#ffffff",
+      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+      maxWidth: "420px",
+      fontSize: "1em",
+      color: "#333",
+      fontWeight: "500",
+      lineHeight: "1.5",
+      border: "1px solid #e0e0e0",
+      userSelect: "none",
+    }}
+  >
+    <strong style={{ fontSize: "1.1em", color: "#2c3e50" }}>Your Reputation</strong>
+    <hr style={{ margin: "8px 0 12px 0", borderColor: "#ddd" }} />
+    <p style={{ margin: "4px 0" }}>
+      <span style={{ color: "#27ae60", fontWeight: "600" }}>Successful Campaigns:</span>{" "}
+      {successfulCampaigns[account.toLowerCase()] || 0}
+    </p>
+    <p style={{ margin: "4px 0" }}>
+      <span style={{ color: "#e74c3c", fontWeight: "600" }}>Refunded Campaigns:</span>{" "}
+      {refundedCampaigns[account.toLowerCase()] || 0}
+    </p>
+  </div>
+)}
+
+
         <h2>Create New Campaign</h2>
         <form onSubmit={handleCreateCampaign}>
           <label>Title</label>
@@ -368,6 +409,8 @@ function App() {
           <button type="submit">Create Campaign</button>
           
         </form>
+        
+        
       </section>
 
       <section>
@@ -393,17 +436,10 @@ function App() {
                 {campaign.isOpen ? "Open" : "Closed"}
               </span>
             </p>
-
-            {/* Delete campaign button if user is owner */}
-            {account?.toLowerCase() === campaign.owner.toLowerCase() && (
-              <button onClick={() => deleteCampaign(campaign.id)}>Delete Campaign</button>
-            )}
-
             {/* Refund button if campaign is closed and user is not owner */}
           {account?.toLowerCase() === campaign.owner.toLowerCase() && !campaign.isOpen && (
              <button onClick={() => handleDeleteCampaign(campaign.id)}>Delete Campaign</button>
           )}
-
 
             {/* Milestone adding form (only if owner and campaign open) */}
             {account?.toLowerCase() === campaign.owner.toLowerCase() && campaign.isOpen && (
