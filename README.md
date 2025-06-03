@@ -105,7 +105,8 @@ https://github.com/user-attachments/assets/b30164dd-080a-4902-a8a3-f230da51061c
 ### Screenshots
 
 #### 1. Campaign Creation Page  
-![Screenshot 2025-05-19 125411](https://github.com/user-attachments/assets/6f1b12f8-5f97-4b85-84e6-d46b2dde792d)
+![image](https://github.com/user-attachments/assets/c277271a-49b6-45d0-a225-b5e79af89e51)
+
 
 _Seamlessly launch new fundraising campaigns by defining funding goals, deadlines, and detailed descriptions._
 
