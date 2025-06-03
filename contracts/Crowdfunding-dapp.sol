@@ -33,6 +33,10 @@ contract CrowdfundingDapp {
     uint256 public campaignCount;
     mapping(uint256 => Campaign) private campaigns;
 
+    // New: Reputation tracking
+    mapping(address => uint256) public successfulCampaigns;
+    mapping(address => uint256) public refundedCampaigns;
+
     event CampaignCreated(uint256 campaignId, address owner, string title, uint256 goal, uint256 deadline);
     event ContributionMade(uint256 campaignId, address contributor, uint256 amount);
     event MilestoneAdded(uint256 campaignId, uint256 milestoneId, string description, uint256 target);
@@ -120,13 +124,13 @@ contract CrowdfundingDapp {
 
         if (c.totalFunds >= c.fundingGoal) {
             c.isOpen = false;
+            successfulCampaigns[c.owner]++; // Track successful campaign
             emit CampaignClosed(_campaignId);
         }
 
         emit ContributionMade(_campaignId, msg.sender, msg.value);
     }
 
-    // Multiple votes per contributor per milestone, overrides previous vote
     function voteMilestone(uint256 _campaignId, uint256 _milestoneId, bool approve)
         external
         campaignExists(_campaignId)
@@ -141,7 +145,6 @@ contract CrowdfundingDapp {
         bool hasVotedBefore = m.voters[msg.sender];
         bool previousVote = m.votes[msg.sender];
 
-        // If voted before, adjust vote counts
         if (hasVotedBefore) {
             if (previousVote) {
                 m.votesFor--;
@@ -150,7 +153,6 @@ contract CrowdfundingDapp {
             }
         }
 
-        // Record new vote
         m.voters[msg.sender] = true;
         m.votes[msg.sender] = approve;
 
@@ -160,7 +162,6 @@ contract CrowdfundingDapp {
             m.votesAgainst++;
         }
 
-        // Update completion status based on majority vote
         uint256 totalContributors = getContributorCount(_campaignId);
         m.isCompleted = m.votesFor > totalContributors / 2;
 
@@ -202,8 +203,10 @@ contract CrowdfundingDapp {
         c.contributions[msg.sender] = 0;
         payable(msg.sender).transfer(amount);
 
-        // Mark refunded after at least one refund
-        c.isRefunded = true;
+        if (!c.isRefunded) {
+            c.isRefunded = true;
+            refundedCampaigns[c.owner]++; // Track refunded campaign
+        }
 
         emit RefundIssued(_campaignId, msg.sender, amount);
     }
@@ -235,7 +238,6 @@ contract CrowdfundingDapp {
         onlyOwner(_campaignId)
     {
         Campaign storage c = campaigns[_campaignId];
-
         require(!c.isOpen, "Campaign is still open");
         require(c.isRefunded || c.totalFunds == 0, "Refunds not completed");
         require(!c.isDeleted, "Campaign already deleted");
@@ -296,5 +298,17 @@ contract CrowdfundingDapp {
             m.votesFor,
             m.votesAgainst
         );
+    }
+
+   
+    function getFundingProgress(uint256 _campaignId)
+        external
+        view
+        campaignExists(_campaignId)
+        returns (uint256)
+    {
+        Campaign storage c = campaigns[_campaignId];
+        if (c.fundingGoal == 0) return 0;
+        return (c.totalFunds * 100) / c.fundingGoal;
     }
 }
